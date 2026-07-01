@@ -2,16 +2,17 @@
 /**
  * PulsaKu - Convert Pulsa Terpercaya
  * Aplikasi konversi pulsa ke saldo e-wallet / rekening bank
+ * TERINTEGRASI dengan panel admin settings
  */
 
 session_start();
 
 // =============================================
-// KONFIGURASI APLIKASI
+// KONFIGURASI PATH
 // =============================================
-define('APP_NAME', 'PulsaKu');
 define('DATA_DIR', __DIR__ . '/data');
 define('TX_FILE', DATA_DIR . '/transactions.json');
+define('SETTINGS_FILE', DATA_DIR . '/settings.json');
 
 // Pastikan folder data ada
 if (!is_dir(DATA_DIR)) {
@@ -19,75 +20,9 @@ if (!is_dir(DATA_DIR)) {
 }
 
 // =============================================
-// DATA MASTER: Provider & Rate
-// =============================================
- $providers = [
-    'telkomsel' => [
-        'name'    => 'Telkomsel',
-        'brands'  => 'Simpati, As, Loop',
-        'rate'    => 0.82,
-        'min'     => 10000,
-        'max'     => 1000000,
-        'color'   => '#e4002b',
-        'icon'    => 'fa-signal',
-    ],
-    'xl' => [
-        'name'    => 'XL / Axis',
-        'brands'  => 'XL, Axis',
-        'rate'    => 0.80,
-        'min'     => 10000,
-        'max'     => 1000000,
-        'color'   => '#0064d2',
-        'icon'    => 'fa-tower-cell',
-    ],
-    'indosat' => [
-        'name'    => 'Indosat Ooredoo',
-        'brands'  => 'IM3, Mentari',
-        'rate'    => 0.78,
-        'min'     => 10000,
-        'max'     => 1000000,
-        'color'   => '#ffd500',
-        'icon'    => 'fa-satellite-dish',
-    ],
-    'tri' => [
-        'name'    => 'Tri (3)',
-        'brands'  => '3 (Tri)',
-        'rate'    => 0.75,
-        'min'     => 10000,
-        'max'     => 500000,
-        'color'   => '#e60012',
-        'icon'    => 'fa-mobile-screen',
-    ],
-    'smartfren' => [
-        'name'    => 'Smartfren',
-        'brands'  => 'Smartfren',
-        'rate'    => 0.76,
-        'min'     => 10000,
-        'max'     => 500000,
-        'color'   => '#ff0000',
-        'icon'    => 'fa-bolt',
-    ],
-];
-
- $paymentMethods = [
-    'dana'       => ['name' => 'DANA',        'icon' => 'fa-wallet',      'placeholder' => '08xx atau nomor DANA'],
-    'gopay'      => ['name' => 'GoPay',       'icon' => 'fa-money-bill',  'placeholder' => '08xx atau nomor GoPay'],
-    'ovo'        => ['name' => 'OVO',         'icon' => 'fa-credit-card', 'placeholder' => '08xx atau nomor OVO'],
-    'shopeepay'  => ['name' => 'ShopeePay',   'icon' => 'fa-bag-shopping','placeholder' => '08xx atau nomor ShopeePay'],
-    'bca'        => ['name' => 'Bank BCA',    'icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening BCA'],
-    'bri'        => ['name' => 'Bank BRI',    'icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening BRI'],
-    'mandiri'    => ['name' => 'Bank Mandiri','icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening Mandiri'],
-    'bsi'        => ['name' => 'Bank BSI',    'icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening BSI'],
-];
-
-// Nominal cepat
- $quickAmounts = [10000, 25000, 50000, 100000, 200000, 500000];
-
-// =============================================
-// FUNGSI-FUNGSI HELPER
+// HELPER FUNCTIONS
 // =============================================
 
-/** Baca semua transaksi dari file JSON */
 function getTransactions(): array {
     if (!file_exists(TX_FILE)) return [];
     $json = file_get_contents(TX_FILE);
@@ -95,41 +30,148 @@ function getTransactions(): array {
     return is_array($data) ? $data : [];
 }
 
-/** Simpan transaksi ke file JSON */
 function saveTransactions(array $txs): void {
     file_put_contents(TX_FILE, json_encode($txs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 }
 
-/** Buat ID transaksi unik */
+/** Baca settings dari file JSON (ditulis oleh admin panel) */
+function getSettings(): array {
+    $defaults = getDefaultSettings();
+    if (!file_exists(SETTINGS_FILE)) return $defaults;
+    $json = file_get_contents(SETTINGS_FILE);
+    $data = json_decode($json, true);
+    if (!is_array($data)) return $defaults;
+
+    // Merge dengan defaults agar tidak ada key yang hilang
+    return [
+        'site_name'       => $data['site_name'] ?? $defaults['site_name'],
+        'site_tagline'    => $data['site_tagline'] ?? $defaults['site_tagline'],
+        'admin_contact'   => $data['admin_contact'] ?? $defaults['admin_contact'],
+        'whatsapp'        => $data['whatsapp'] ?? $defaults['whatsapp'],
+        'maintenance'     => !empty($data['maintenance']),
+        'auto_approve'    => !empty($data['auto_approve']),
+        'min_transaction' => intval($data['min_transaction'] ?? $defaults['min_transaction']),
+        'providers'       => $data['providers'] ?? $defaults['providers'],
+        'payment_methods' => $data['payment_methods'] ?? $defaults['payment_methods'],
+    ];
+}
+
+function getDefaultSettings(): array {
+    return [
+        'site_name'       => 'PulsaKu',
+        'site_tagline'    => 'Convert Pulsa Terpercaya #1 Indonesia',
+        'admin_contact'   => 'admin@pulsaku.id',
+        'whatsapp'        => '6281234567890',
+        'maintenance'     => false,
+        'auto_approve'    => false,
+        'min_transaction' => 10000,
+        'providers' => [
+            'telkomsel' => ['name' => 'Telkomsel', 'brands' => 'Simpati, As, Loop', 'rate' => 0.82, 'min' => 10000, 'max' => 1000000, 'color' => '#e4002b', 'icon' => 'fa-signal', 'active' => true],
+            'xl'        => ['name' => 'XL / Axis', 'brands' => 'XL, Axis', 'rate' => 0.80, 'min' => 10000, 'max' => 1000000, 'color' => '#0064d2', 'icon' => 'fa-tower-cell', 'active' => true],
+            'indosat'   => ['name' => 'Indosat Ooredoo', 'brands' => 'IM3, Mentari', 'rate' => 0.78, 'min' => 10000, 'max' => 1000000, 'color' => '#ffd500', 'icon' => 'fa-satellite-dish', 'active' => true],
+            'tri'       => ['name' => 'Tri (3)', 'brands' => '3 (Tri)', 'rate' => 0.75, 'min' => 10000, 'max' => 500000, 'color' => '#e60012', 'icon' => 'fa-mobile-screen', 'active' => true],
+            'smartfren' => ['name' => 'Smartfren', 'brands' => 'Smartfren', 'rate' => 0.76, 'min' => 10000, 'max' => 500000, 'color' => '#ff0000', 'icon' => 'fa-bolt', 'active' => true],
+        ],
+        'payment_methods' => [
+            'dana'       => ['name' => 'DANA',        'icon' => 'fa-wallet',           'placeholder' => '08xx atau nomor DANA',     'active' => true, 'type' => 'ewallet'],
+            'gopay'      => ['name' => 'GoPay',       'icon' => 'fa-money-bill',       'placeholder' => '08xx atau nomor GoPay',    'active' => true, 'type' => 'ewallet'],
+            'ovo'        => ['name' => 'OVO',         'icon' => 'fa-credit-card',      'placeholder' => '08xx atau nomor OVO',      'active' => true, 'type' => 'ewallet'],
+            'shopeepay'  => ['name' => 'ShopeePay',   'icon' => 'fa-bag-shopping',     'placeholder' => '08xx atau nomor ShopeePay','active' => true, 'type' => 'ewallet'],
+            'bca'        => ['name' => 'Bank BCA',    'icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening BCA',       'active' => true, 'type' => 'bank'],
+            'bri'        => ['name' => 'Bank BRI',    'icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening BRI',       'active' => true, 'type' => 'bank'],
+            'mandiri'    => ['name' => 'Bank Mandiri','icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening Mandiri',   'active' => true, 'type' => 'bank'],
+            'bsi'        => ['name' => 'Bank BSI',    'icon' => 'fa-building-columns', 'placeholder' => 'Nomor rekening BSI',       'active' => true, 'type' => 'bank'],
+        ],
+    ];
+}
+
 function generateTxId(): string {
     return 'TXN' . date('Ymd') . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 6));
 }
 
-/** Format rupiah */
 function rupiah(int $val): string {
     return 'Rp' . number_format($val, 0, ',', '.');
 }
 
-/** Sanitasi input */
 function sanitize(string $str): string {
     return htmlspecialchars(trim($str), ENT_QUOTES, 'UTF-8');
 }
 
-/** Set flash message */
 function setFlash(string $type, string $msg): void {
     $_SESSION['flash'] = ['type' => $type, 'msg' => $msg];
 }
 
-/** Ambil & hapus flash message */
 function getFlash(): ?array {
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
     return $flash;
 }
 
-/** Hitung estimasi diterima */
 function calcReceived(int $amount, float $rate): int {
     return (int) floor($amount * $rate);
+}
+
+// =============================================
+// MUAT SETTINGS & DATA
+// =============================================
+ $settings = getSettings();
+ $allProviders = $settings['providers'];
+ $allPaymentMethods = $settings['payment_methods'];
+ $appName = sanitize($settings['site_name']);
+ $appTagline = sanitize($settings['site_tagline']);
+ $waNumber = sanitize($settings['whatsapp']);
+ $minTx = intval($settings['min_transaction']);
+
+// Filter HANYA yang aktif
+ $providers = array_filter($allProviders, fn($p) => !empty($p['active']));
+ $paymentMethods = array_filter($allPaymentMethods, fn($m) => !empty($m['active']));
+
+// Nominal cepat
+ $quickAmounts = [10000, 25000, 50000, 100000, 200000, 500000];
+
+// =============================================
+// MAINTENANCE MODE
+// =============================================
+if ($settings['maintenance']) {
+    // Admin tetap bisa akses
+    $isAdmin = !empty($_SESSION['admin_logged_in']);
+    $isAdminPath = strpos($_SERVER['REQUEST_URI'] ?? '', '/admin') === 0;
+    if (!$isAdmin && !$isAdminPath) {
+        http_response_code(503);
+        ?>
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Maintenance - <?= $appName ?></title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+            <style>
+                :root{--bg:#060d09;--fg:#e4f2ea;--muted:#6b9a80;--accent:#10b981}
+                *{box-sizing:border-box}
+                body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--fg);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+                .bg-glow{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 50% 50% at 50% 50%,rgba(16,185,129,0.05) 0%,transparent 70%)}
+            </style>
+        </head>
+        <body>
+            <div class="bg-glow"></div>
+            <div class="relative z-10 text-center px-6 max-w-md">
+                <div class="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-wrench text-amber-400 text-3xl"></i>
+                </div>
+                <h1 class="font-display text-3xl font-bold mb-3">Sedang Maintenance</h1>
+                <p class="text-sm text-[var(--muted)] leading-relaxed mb-6">Kami sedang melakukan pemeliharaan sistem. Silakan kembali beberapa saat lagi.</p>
+                <a href="https://wa.me/<?= $waNumber ?>" target="_blank" class="inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300 transition-colors">
+                    <i class="fab fa-whatsapp"></i> Hubungi via WhatsApp
+                </a>
+            </div>
+        </body>
+        </html>
+        <?php
+        exit;
+    }
 }
 
 // =============================================
@@ -138,13 +180,12 @@ function calcReceived(int $amount, float $rate): int {
  $flash = getFlash();
  $errors = [];
  $lastTx = null;
- $currentTab = 'form'; // form, result, history
+ $currentTab = 'form';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? '';
 
-    // --- Konversi Pulsa ---
     if ($action === 'convert') {
         $provider      = sanitize($_POST['provider'] ?? '');
         $phone         = sanitize($_POST['phone'] ?? '');
@@ -153,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $payAccount    = sanitize($_POST['pay_account'] ?? '');
 
         // Validasi provider
-        if (empty($provider) || !isset($providers[$provider])) {
+        if (empty($provider) || !isset($allProviders[$provider]) || empty($allProviders[$provider]['active'])) {
             $errors[] = 'Pilih provider yang valid.';
         }
         // Validasi nomor HP
@@ -161,17 +202,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Nomor HP tidak valid. Format: 08xxxxxxxxxx (10-13 digit).';
         }
         // Validasi nominal
-        if ($amount < 10000) {
-            $errors[] = 'Minimal konversi Rp10.000.';
+        if ($amount < $minTx) {
+            $errors[] = 'Minimal konversi ' . rupiah($minTx) . '.';
         }
-        if (isset($providers[$provider]) && $amount > $providers[$provider]['max']) {
-            $errors[] = 'Maksimal konversi ' . rupiah($providers[$provider]['max']) . ' untuk ' . $providers[$provider]['name'] . '.';
+        if (isset($allProviders[$provider]) && $amount > $allProviders[$provider]['max']) {
+            $errors[] = 'Maksimal konversi ' . rupiah($allProviders[$provider]['max']) . ' untuk ' . $allProviders[$provider]['name'] . '.';
         }
         if ($amount % 1000 !== 0) {
             $errors[] = 'Nominal harus kelipatan Rp1.000.';
         }
         // Validasi metode bayar
-        if (empty($payment) || !isset($paymentMethods[$payment])) {
+        if (empty($payment) || !isset($allPaymentMethods[$payment]) || empty($allPaymentMethods[$payment]['active'])) {
             $errors[] = 'Pilih metode pembayaran tujuan.';
         }
         if (empty($payAccount)) {
@@ -179,8 +220,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
-            $prov = $providers[$provider];
+            $prov = $allProviders[$provider];
             $received = calcReceived($amount, $prov['rate']);
+
+            // Auto-approve jika diaktifkan di admin
+            $initialStatus = $settings['auto_approve'] ? 'success' : 'pending';
+
             $tx = [
                 'id'              => generateTxId(),
                 'provider'        => $provider,
@@ -190,9 +235,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'rate'            => $prov['rate'],
                 'received'        => $received,
                 'payment'         => $payment,
-                'payment_name'    => $paymentMethods[$payment]['name'],
+                'payment_name'    => $allPaymentMethods[$payment]['name'],
                 'payment_account' => $payAccount,
-                'status'          => 'pending',
+                'status'          => $initialStatus,
                 'created_at'      => date('Y-m-d H:i:s'),
                 'ip'              => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
             ];
@@ -201,11 +246,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             array_unshift($allTx, $tx);
             saveTransactions($allTx);
 
-            
- $currentTab = 'result';
-setFlash('success', 'Transaksi berhasil dibuat! Segera transfer pulsa Anda.');
-header('Location: transfer.php?tx=' . $tx['id']);
-exit;
+            $lastTx = $tx;
+            $currentTab = 'result';
+
+            if ($settings['auto_approve']) {
+                setFlash('success', 'Transaksi otomatis disetujui! Dana akan dikirim ke ' . $tx['payment_name'] . ' Anda.');
+                header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . '?tab=result');
+            } else {
+                setFlash('success', 'Transaksi berhasil dibuat! Segera transfer pulsa Anda.');
+                header('Location: transfer.php?tx=' . $tx['id']);
+            }
+            exit;
         } else {
             setFlash('error', implode('<br>', $errors));
             header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . '?tab=form');
@@ -213,7 +264,6 @@ exit;
         }
     }
 
-    // --- Cek Status ---
     if ($action === 'check_status') {
         $txId = sanitize($_POST['tx_id'] ?? '');
         $allTx = getTransactions();
@@ -250,12 +300,10 @@ if ($lastTx) {
  $allTransactions = getTransactions();
  $totalConverted = 0;
  $totalUsers = 0;
- $pendingCount = 0;
  $phoneSet = [];
 foreach ($allTransactions as $t) {
     $totalConverted += $t['amount'];
     $phoneSet[$t['phone']] = true;
-    if ($t['status'] === 'pending') $pendingCount++;
 }
  $totalUsers = count($phoneSet);
  $successCount = count(array_filter($allTransactions, fn($t) => $t['status'] === 'success'));
@@ -268,7 +316,7 @@ foreach ($allTransactions as $t) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= APP_NAME ?> - Convert Pulsa Terpercaya #1 Indonesia</title>
+    <title><?= $appName ?> - Convert Pulsa Terpercaya #1 Indonesia</title>
     <meta name="description" content="Konversi pulsa ke saldo DANA, GoPay, OVO, ShopeePay, dan rekening bank. Proses cepat, rate tinggi, aman terpercaya.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -306,8 +354,6 @@ foreach ($allTransactions as $t) {
             overflow-x: hidden;
         }
         html { scroll-behavior: smooth; }
-
-        /* Background animasi */
         .bg-scene {
             position: fixed; inset: 0; z-index: 0; pointer-events: none;
             background:
@@ -322,8 +368,6 @@ foreach ($allTransactions as $t) {
                 linear-gradient(90deg, rgba(16,185,129,0.025) 1px, transparent 1px);
             background-size: 80px 80px;
         }
-
-        /* Kartu */
         .card {
             background: var(--card);
             border: 1px solid var(--border);
@@ -335,8 +379,6 @@ foreach ($allTransactions as $t) {
             border-color: rgba(16,185,129,0.3);
             box-shadow: 0 0 40px rgba(16,185,129,0.06);
         }
-
-        /* Input form */
         .fi {
             background: rgba(6,13,9,0.9);
             border: 1.5px solid var(--border);
@@ -366,8 +408,6 @@ foreach ($allTransactions as $t) {
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
-
-        /* Tombol utama */
         .btn-main {
             background: linear-gradient(135deg, #10b981, #059669);
             color: #fff;
@@ -388,14 +428,7 @@ foreach ($allTransactions as $t) {
             box-shadow: 0 8px 30px rgba(16,185,129,0.3);
         }
         .btn-main:active { transform: translateY(0); }
-        .btn-main:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
-            box-shadow: none !important;
-        }
-
-        /* Tombol sekunder */
+        .btn-main:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
         .btn-sec {
             background: var(--glass);
             border: 1px solid var(--border);
@@ -408,12 +441,7 @@ foreach ($allTransactions as $t) {
             transition: all 0.25s ease;
             font-family: inherit;
         }
-        .btn-sec:hover {
-            background: rgba(16,185,129,0.08);
-            border-color: rgba(16,185,129,0.3);
-        }
-
-        /* Chip nominal */
+        .btn-sec:hover { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.3); }
         .chip {
             background: var(--glass);
             border: 1px solid var(--border);
@@ -427,23 +455,14 @@ foreach ($allTransactions as $t) {
             white-space: nowrap;
             font-family: inherit;
         }
-        .chip:hover, .chip.active {
-            background: rgba(16,185,129,0.1);
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        /* Rate bar */
+        .chip:hover, .chip.active { background: rgba(16,185,129,0.1); border-color: var(--accent); color: var(--accent); }
         .rate-bar { height: 5px; border-radius: 3px; background: rgba(16,185,129,0.1); overflow: hidden; }
         .rate-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #10b981, #34d399); transition: width 1.2s ease; }
-
-        /* Badge status */
         .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .badge-pending { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
         .badge-success { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
         .badge-failed { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
-
-        /* Tab navigasi */
+        .badge-sent { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
         .tab-btn {
             padding: 10px 24px;
             border-radius: 10px;
@@ -457,106 +476,50 @@ foreach ($allTransactions as $t) {
             font-family: inherit;
         }
         .tab-btn:hover { color: var(--fg); background: var(--glass); }
-        .tab-btn.active {
-            background: rgba(16,185,129,0.1);
-            border-color: rgba(16,185,129,0.25);
-            color: var(--accent);
-        }
-
-        /* Toast */
-        .toast-container {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 9999; width: calc(100% - 2rem); max-width: 480px;
-        }
-        .toast {
-            padding: 16px 20px;
-            border-radius: 14px;
-            backdrop-filter: blur(20px);
-            animation: toastIn 0.4s ease;
-            display: flex; align-items: flex-start; gap: 12px;
-        }
+        .tab-btn.active { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.25); color: var(--accent); }
+        .toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; width: calc(100% - 2rem); max-width: 480px; }
+        .toast { padding: 16px 20px; border-radius: 14px; backdrop-filter: blur(20px); animation: toastIn 0.4s ease; display: flex; align-items: flex-start; gap: 12px; }
         .toast-success { background: rgba(6,30,18,0.95); border: 1px solid rgba(16,185,129,0.3); }
         .toast-error { background: rgba(30,6,6,0.95); border: 1px solid rgba(239,68,68,0.3); }
         @keyframes toastIn { from { opacity:0; transform:translateY(-16px); } to { opacity:1; transform:translateY(0); } }
-
-        /* Animasi masuk */
         .reveal { opacity: 0; transform: translateY(24px); transition: all 0.6s cubic-bezier(0.4,0,0.2,1); }
         .reveal.visible { opacity: 1; transform: translateY(0); }
-
-        /* Pulse */
         .pulse { animation: pulse 2.5s ease-in-out infinite; }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.3); }
-            50% { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
-        }
-
-        /* Stat card number */
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.3); } 50% { box-shadow: 0 0 0 10px rgba(16,185,129,0); } }
         .stat-num { font-variant-numeric: tabular-nums; }
-
-        /* Provider icon circle */
-        .prov-icon {
-            width: 40px; height: 40px;
-            border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 16px; color: #fff;
-            flex-shrink: 0;
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: var(--bg); }
-        ::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.2); border-radius: 3px; }
-
-        /* Floating dots */
-        .float-dot {
-            position: absolute;
-            width: 4px; height: 4px;
-            border-radius: 50%;
-            background: rgba(16,185,129,0.25);
-            animation: floatDot 8s ease-in-out infinite;
-        }
-        @keyframes floatDot {
-            0%, 100% { transform: translateY(0) scale(1); opacity: 0.25; }
-            50% { transform: translateY(-30px) scale(1.5); opacity: 0.5; }
-        }
-
-        /* Responsive table */
+        .prov-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; flex-shrink: 0; }
         .tx-table { width: 100%; border-collapse: separate; border-spacing: 0; }
         .tx-table th { text-align: left; padding: 12px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border-bottom: 1px solid var(--border); }
         .tx-table td { padding: 14px 16px; font-size: 14px; border-bottom: 1px solid var(--border); }
         .tx-table tr:last-child td { border-bottom: none; }
         .tx-table tbody tr { transition: background 0.2s ease; }
         .tx-table tbody tr:hover { background: rgba(16,185,129,0.03); }
-
+        .float-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: rgba(16,185,129,0.25); animation: floatDot 8s ease-in-out infinite; }
+        @keyframes floatDot { 0%, 100% { transform: translateY(0) scale(1); opacity: 0.25; } 50% { transform: translateY(-30px) scale(1.5); opacity: 0.5; } }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.2); border-radius: 3px; }
         @media (max-width: 768px) {
             .tx-table { font-size: 12px; }
             .tx-table th, .tx-table td { padding: 10px 10px; }
             .hide-mobile { display: none; }
         }
-
         @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                transition-duration: 0.01ms !important;
-            }
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
         }
     </style>
 </head>
 <body>
 
-<!-- Background -->
 <div class="bg-scene"></div>
 <div class="grid-overlay"></div>
 
-<!-- Toast -->
 <?php if ($flash): ?>
 <div class="toast-container">
     <div class="toast toast-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>">
         <i class="fas <?= $flash['type'] === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-red-400' ?> mt-0.5"></i>
         <div class="text-sm leading-relaxed"><?= $flash['msg'] ?></div>
-        <button onclick="this.parentElement.remove()" class="ml-auto text-white/30 hover:text-white/60 transition-colors">
-            <i class="fas fa-xmark"></i>
-        </button>
+        <button onclick="this.parentElement.remove()" class="ml-auto text-white/30 hover:text-white/60 transition-colors"><i class="fas fa-xmark"></i></button>
     </div>
 </div>
 <?php endif; ?>
@@ -568,7 +531,7 @@ foreach ($allTransactions as $t) {
             <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-shadow">
                 <i class="fas fa-bolt text-white text-sm"></i>
             </div>
-            <span class="font-display font-bold text-lg tracking-tight"><?= APP_NAME ?></span>
+            <span class="font-display font-bold text-lg tracking-tight"><?= $appName ?></span>
         </a>
         <div class="flex items-center gap-3">
             <a href="#rate" class="btn-sec hidden sm:inline-flex items-center gap-2 text-sm">
@@ -583,9 +546,8 @@ foreach ($allTransactions as $t) {
 
 <main class="relative z-10 pt-16">
 
-    <!-- ==================== HERO ==================== -->
+    <!-- HERO -->
     <section class="relative py-20 sm:py-28 overflow-hidden">
-        <!-- Dekorasi titik mengambang -->
         <div class="float-dot" style="top:15%;left:10%;animation-delay:0s"></div>
         <div class="float-dot" style="top:30%;right:15%;animation-delay:1.5s"></div>
         <div class="float-dot" style="top:60%;left:25%;animation-delay:3s"></div>
@@ -593,7 +555,6 @@ foreach ($allTransactions as $t) {
         <div class="float-dot" style="top:40%;left:60%;animation-delay:2s"></div>
 
         <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center">
-            <!-- Badge -->
             <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-xs font-semibold mb-8 reveal">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse"></span>
                 Layanan aktif 24 jam
@@ -605,10 +566,9 @@ foreach ($allTransactions as $t) {
             </h1>
 
             <p class="text-base sm:text-lg text-[var(--muted)] max-w-xl mx-auto mb-10 leading-relaxed reveal" style="transition-delay:0.2s">
-                Ubah sisa pulsa Anda menjadi saldo DANA, GoPay, OVO, ShopeePay, atau transfer ke rekening bank. Proses otomatis, rate kompetitif, tanpa ribet.
+                <?= $appTagline ?>
             </p>
 
-            <!-- Statistik mini -->
             <div class="flex flex-wrap justify-center gap-8 sm:gap-14 mb-12 reveal" style="transition-delay:0.3s">
                 <div class="text-center">
                     <div class="font-display text-2xl sm:text-3xl font-bold text-emerald-400 stat-num"><?= number_format($totalConverted / 1000000, 1, ',', '.') ?>jt+</div>
@@ -635,10 +595,9 @@ foreach ($allTransactions as $t) {
         </div>
     </section>
 
-    <!-- ==================== FORM KONVERSI ==================== -->
+    <!-- FORM KONVERSI -->
     <section id="konversi" class="py-16 sm:py-20">
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
-            <!-- Tab navigasi -->
             <div class="flex justify-center gap-2 mb-10 reveal">
                 <button onclick="switchTab('form')" class="tab-btn <?= $currentTab === 'form' ? 'active' : '' ?>" id="tabForm">
                     <i class="fas fa-exchange-alt mr-1.5"></i> Konversi Pulsa
@@ -651,7 +610,7 @@ foreach ($allTransactions as $t) {
                 </button>
             </div>
 
-            <!-- TAB: Form Konversi -->
+            <!-- TAB: Form -->
             <div id="panelForm" class="<?= $currentTab !== 'form' ? 'hidden' : '' ?>">
                 <div class="max-w-2xl mx-auto">
                     <div class="card p-6 sm:p-8 reveal">
@@ -661,7 +620,7 @@ foreach ($allTransactions as $t) {
                         <form method="POST" action="" id="convertForm" novalidate>
                             <input type="hidden" name="action" value="convert">
 
-                            <!-- Provider -->
+                            <!-- Provider — DARI SETTINGS -->
                             <div class="mb-5">
                                 <label class="block text-sm font-semibold mb-2">Provider <span class="text-red-400">*</span></label>
                                 <select name="provider" id="providerSelect" class="fi" required>
@@ -693,7 +652,7 @@ foreach ($allTransactions as $t) {
                                 <label class="block text-sm font-semibold mb-2">Nominal Pulsa <span class="text-red-400">*</span></label>
                                 <div class="relative mb-3">
                                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm font-semibold">Rp</span>
-                                    <input type="number" name="amount" id="amountInput" class="fi !pl-12" placeholder="10000" min="10000" step="1000" required>
+                                    <input type="number" name="amount" id="amountInput" class="fi !pl-12" placeholder="<?= $minTx ?>" min="<?= $minTx ?>" step="1000" required>
                                 </div>
                                 <div class="flex flex-wrap gap-2" id="chipContainer">
                                     <?php foreach ($quickAmounts as $qa): ?>
@@ -716,31 +675,39 @@ foreach ($allTransactions as $t) {
 
                             <hr class="border-white/[0.04] my-6">
 
-                            <!-- Metode Pembayaran Tujuan -->
+                            <!-- Metode Bayar — DARI SETTINGS -->
                             <div class="mb-5">
                                 <label class="block text-sm font-semibold mb-2">Diterima via <span class="text-red-400">*</span></label>
                                 <select name="payment" id="paymentSelect" class="fi" required>
                                     <option value="">-- Pilih Metode --</option>
+                                    <?php
+                                    $ewallets = array_filter($paymentMethods, fn($m) => ($m['type'] ?? '') === 'ewallet');
+                                    $banks = array_filter($paymentMethods, fn($m) => ($m['type'] ?? '') === 'bank');
+                                    ?>
+                                    <?php if (!empty($ewallets)): ?>
                                     <optgroup label="E-Wallet">
-                                        <?php foreach (['dana','gopay','ovo','shopeepay'] as $k): ?>
-                                        <option value="<?= $k ?>" data-ph="<?= $paymentMethods[$k]['placeholder'] ?>"><?= $paymentMethods[$k]['name'] ?></option>
+                                        <?php foreach ($ewallets as $k => $pm): ?>
+                                        <option value="<?= $k ?>" data-ph="<?= $pm['placeholder'] ?>"><?= $pm['name'] ?></option>
                                         <?php endforeach; ?>
                                     </optgroup>
+                                    <?php endif; ?>
+                                    <?php if (!empty($banks)): ?>
                                     <optgroup label="Transfer Bank">
-                                        <?php foreach (['bca','bri','mandiri','bsi'] as $k): ?>
-                                        <option value="<?= $k ?>" data-ph="<?= $paymentMethods[$k]['placeholder'] ?>"><?= $paymentMethods[$k]['name'] ?></option>
+                                        <?php foreach ($banks as $k => $pm): ?>
+                                        <option value="<?= $k ?>" data-ph="<?= $pm['placeholder'] ?>"><?= $pm['name'] ?></option>
                                         <?php endforeach; ?>
                                     </optgroup>
+                                    <?php endif; ?>
                                 </select>
                             </div>
 
                             <!-- Nomor Akun Tujuan -->
+                            <?php $firstPm = reset($paymentMethods); ?>
                             <div class="mb-8">
-                                <label class="block text-sm font-semibold mb-2">Nomor <?= strtolower($paymentMethods[array_key_first($paymentMethods)]['name']) ?> / Rekening <span class="text-red-400">*</span></label>
-                                <input type="text" name="pay_account" id="payAccountInput" class="fi" placeholder="<?= $paymentMethods[array_key_first($paymentMethods)]['placeholder'] ?>" inputmode="numeric" required>
+                                <label class="block text-sm font-semibold mb-2">Nomor Akun / Rekening <span class="text-red-400">*</span></label>
+                                <input type="text" name="pay_account" id="payAccountInput" class="fi" placeholder="<?= $firstPm ? $firstPm['placeholder'] : 'Masukkan nomor' ?>" inputmode="numeric" required>
                             </div>
 
-                            <!-- Submit -->
                             <button type="submit" class="btn-main flex items-center justify-center gap-2" id="submitBtn">
                                 <i class="fas fa-paper-plane"></i>
                                 <span>Convert Sekarang</span>
@@ -748,7 +715,7 @@ foreach ($allTransactions as $t) {
 
                             <p class="text-center text-xs text-[var(--muted)] mt-4">
                                 <i class="fas fa-shield-halved mr-1"></i>
-                                Data Anda terenkripsi dan aman. Kami tidak menyimpan PIN atau password.
+                                Data Anda terenkripsi dan aman.
                             </p>
                         </form>
                     </div>
@@ -765,9 +732,7 @@ foreach ($allTransactions as $t) {
                             <input type="hidden" name="action" value="check_status">
                             <div class="flex gap-3">
                                 <input type="text" name="tx_id" class="fi" placeholder="Contoh: TXN20250101ABC123" required style="text-transform:uppercase">
-                                <button type="submit" class="btn-main !w-auto !px-6 whitespace-nowrap">
-                                    <i class="fas fa-search"></i> Cari
-                                </button>
+                                <button type="submit" class="btn-main !w-auto !px-6 whitespace-nowrap"><i class="fas fa-search"></i> Cari</button>
                             </div>
                         </form>
                     </div>
@@ -815,8 +780,13 @@ foreach ($allTransactions as $t) {
                                         <td><span class="font-mono text-xs text-emerald-400/80"><?= $tx['id'] ?></span></td>
                                         <td>
                                             <div class="flex items-center gap-2">
-                                                <div class="prov-icon" style="background:<?= $providers[$tx['provider']]['color'] ?? '#666' ?>">
-                                                    <i class="fas <?= $providers[$tx['provider']]['icon'] ?? 'fa-signal' ?>"></i>
+                                                <?php
+                                                $txProv = $allProviders[$tx['provider']] ?? null;
+                                                $txColor = $txProv ? $txProv['color'] : '#666';
+                                                $txIcon = $txProv ? $txProv['icon'] : 'fa-signal';
+                                                ?>
+                                                <div class="prov-icon" style="background:<?= $txColor ?>;width:32px;height:32px;border-radius:8px;font-size:13px">
+                                                    <i class="fas <?= $txIcon ?>"></i>
                                                 </div>
                                                 <span class="text-sm"><?= $tx['provider_name'] ?></span>
                                             </div>
@@ -825,13 +795,7 @@ foreach ($allTransactions as $t) {
                                         <td class="hide-mobile text-emerald-400 font-semibold"><?= rupiah($tx['received']) ?></td>
                                         <td class="text-sm"><?= $tx['payment_name'] ?></td>
                                         <td>
-                                        
-/* Tambahkan di dalam <style> di index.php */
-.badge-sent {
-    background: rgba(59,130,246,0.12);
-    color: #60a5fa;
-    border: 1px solid rgba(59,130,246,0.25);
-}
+                                            <span class="badge badge-<?= $tx['status'] ?>">
                                                 <i class="fas fa-circle text-[5px]"></i>
                                                 <?= ucfirst($tx['status']) ?>
                                             </span>
@@ -847,10 +811,10 @@ foreach ($allTransactions as $t) {
                 </div>
             </div>
 
-            <!-- ==================== HASIL TRANSAKSI ==================== -->
+            <!-- HASIL TRANSAKSI -->
             <?php if ($lastTx && $currentTab === 'result'): ?>
             <div id="result" class="max-w-2xl mx-auto mt-10">
-                <div class="card p-6 sm:p-8 border-emerald-500/25 reveal" style="border-color:rgba(16,185,129,0.3)">
+                <div class="card p-6 sm:p-8 reveal" style="border-color:rgba(16,185,129,0.3)">
                     <div class="flex items-center gap-3 mb-6">
                         <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center pulse">
                             <i class="fas fa-check text-emerald-400 text-xl"></i>
@@ -860,7 +824,6 @@ foreach ($allTransactions as $t) {
                             <p class="text-xs text-[var(--muted)]">Segera transfer pulsa sesuai instruksi</p>
                         </div>
                     </div>
-
                     <div class="space-y-3 mb-6">
                         <div class="flex justify-between py-2.5 border-b border-white/[0.04]">
                             <span class="text-sm text-[var(--muted)]">ID Transaksi</span>
@@ -897,23 +860,6 @@ foreach ($allTransactions as $t) {
                             </span>
                         </div>
                     </div>
-
-                    <!-- Instruksi transfer -->
-                    <div class="p-4 rounded-xl bg-amber-500/5 border border-amber-500/15 mb-6">
-                        <div class="flex items-start gap-3">
-                            <i class="fas fa-triangle-exclamation text-amber-400 mt-0.5"></i>
-                            <div class="text-sm">
-                                <p class="font-semibold text-amber-300 mb-1">Instruksi Penting</p>
-                                <ol class="text-amber-200/70 space-y-1 list-decimal list-inside text-xs leading-relaxed">
-                                    <li>Transfer pulsa <strong class="text-amber-300"><?= rupiah($lastTx['amount']) ?></strong> dari nomor <strong class="text-amber-300"><?= $lastTx['phone'] ?></strong></li>
-                                    <li>Pastikan nominal transfer <strong class="text-amber-300">persis</strong> sesuai agar sistem bisa verifikasi otomatis</li>
-                                    <li>Proses verifikasi membutuhkan waktu 1-5 menit</li>
-                                    <li>Dana akan dikirim ke <?= $lastTx['payment_name'] ?> Anda setelah pulsa berhasil diterima</li>
-                                </ol>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="flex gap-3">
                         <button onclick="copyTxId('<?= $lastTx['id'] ?>')" class="btn-sec flex-1 flex items-center justify-center gap-2">
                             <i class="fas fa-copy"></i> Salin ID
@@ -928,7 +874,7 @@ foreach ($allTransactions as $t) {
         </div>
     </section>
 
-    <!-- ==================== RATE TABLE ==================== -->
+    <!-- RATE TABLE — DARI SETTINGS -->
     <section id="rate" class="py-16 sm:py-20" style="background:rgba(255,255,255,0.01)">
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
             <div class="text-center mb-12 reveal">
@@ -940,8 +886,10 @@ foreach ($allTransactions as $t) {
             </div>
 
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <?php $pi = 0; ?>
                 <?php foreach ($providers as $key => $p): ?>
-                <div class="card p-5 reveal" style="transition-delay:<?= array_search($key, array_keys($providers)) * 0.08 ?>s">
+                <div class="card p-5 reveal" style="transition-delay:<?= $pi * 0.08 ?>s">
+                    <?php $pi++; ?>
                     <div class="flex items-center gap-3 mb-4">
                         <div class="prov-icon" style="background:<?= $p['color'] ?>">
                             <i class="fas <?= $p['icon'] ?>"></i>
@@ -975,14 +923,13 @@ foreach ($allTransactions as $t) {
         </div>
     </section>
 
-    <!-- ==================== CARA KERJA ==================== -->
+    <!-- CARA KERJA -->
     <section id="cara-kerja" class="py-16 sm:py-20">
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
             <div class="text-center mb-12 reveal">
                 <h2 class="font-display text-3xl sm:text-4xl font-bold mb-3">Cara Kerja</h2>
                 <p class="text-sm text-[var(--muted)]">3 langkah mudah, tanpa registrasi</p>
             </div>
-
             <div class="grid sm:grid-cols-3 gap-6">
                 <?php
                 $steps = [
@@ -1007,11 +954,11 @@ foreach ($allTransactions as $t) {
         </div>
     </section>
 
-    <!-- ==================== KEUNGGULAN ==================== -->
+    <!-- KEUNGGULAN -->
     <section class="py-16 sm:py-20" style="background:rgba(255,255,255,0.01)">
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
             <div class="text-center mb-12 reveal">
-                <h2 class="font-display text-3xl sm:text-4xl font-bold mb-3">Mengapa <?= APP_NAME ?>?</h2>
+                <h2 class="font-display text-3xl sm:text-4xl font-bold mb-3">Mengapa <?= $appName ?>?</h2>
             </div>
             <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <?php
@@ -1035,7 +982,7 @@ foreach ($allTransactions as $t) {
         </div>
     </section>
 
-    <!-- ==================== FAQ ==================== -->
+    <!-- FAQ -->
     <section id="faq" class="py-16 sm:py-20">
         <div class="max-w-3xl mx-auto px-4 sm:px-6">
             <div class="text-center mb-12 reveal">
@@ -1048,10 +995,10 @@ foreach ($allTransactions as $t) {
                     ['q' => 'Apakah perlu mendaftar akun?', 'a' => 'Tidak perlu. Cukup isi form konversi dan langsung proses. Tanpa registrasi, tanpa login.'],
                     ['q' => 'Apa itu rate konversi?', 'a' => 'Rate adalah persentase dari nominal pulsa yang akan Anda terima dalam bentuk uang. Misal rate 82%, maka pulsa Rp100.000 menjadi Rp82.000.'],
                     ['q' => 'Bagaimana jika transfer pulsa tidak sesuai nominal?', 'a' => 'Nominal harus persis agar sistem bisa verifikasi otomatis. Jika tidak sesuai, silakan hubungi support dengan menyertakan bukti transfer.'],
-                    ['q' => 'Provider apa saja yang didukung?', 'a' => 'Kami menerima pulsa dari Telkomsel, XL/Axis, Indosat Ooredoo, Tri (3), dan Smartfren.'],
+                    ['q' => 'Provider apa saja yang didukung?', 'a' => 'Kami menerima pulsa dari ' . implode(', ', array_column($providers, 'name')) . '.'],
                     ['q' => 'Apakah ada biaya tambahan?', 'a' => 'Tidak ada biaya tambahan. Yang tertera di estimasi adalah jumlah bersih yang akan Anda terima.'],
                 ];
-                foreach ($faqs as $i => $faq):
+                foreach ($faqs as $faq):
                 ?>
                 <div class="card overflow-hidden">
                     <button onclick="toggleFaq(this)" class="w-full flex items-center justify-between p-5 text-left group">
@@ -1069,7 +1016,7 @@ foreach ($allTransactions as $t) {
 
 </main>
 
-<!-- ==================== FOOTER ==================== -->
+<!-- FOOTER — DARI SETTINGS -->
 <footer class="relative z-10 border-t border-white/[0.04] py-10">
     <div class="max-w-6xl mx-auto px-4 sm:px-6">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1077,38 +1024,35 @@ foreach ($allTransactions as $t) {
                 <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
                     <i class="fas fa-bolt text-white text-xs"></i>
                 </div>
-                <span class="font-display font-bold text-sm"><?= APP_NAME ?></span>
+                <span class="font-display font-bold text-sm"><?= $appName ?></span>
             </div>
             <p class="text-xs text-[var(--muted)] text-center">
-                &copy; <?= date('Y') ?> <?= APP_NAME ?>. Layanan konversi pulsa terpercaya di Indonesia.
+                &copy; <?= date('Y') ?> <?= $appName ?>. <?= $appTagline ?>
             </p>
             <div class="flex items-center gap-4">
-                <a href="#" class="text-[var(--muted)] hover:text-emerald-400 transition-colors text-sm"><i class="fab fa-whatsapp"></i></a>
-                <a href="#" class="text-[var(--muted)] hover:text-emerald-400 transition-colors text-sm"><i class="fab fa-instagram"></i></a>
-                <a href="#" class="text-[var(--muted)] hover:text-emerald-400 transition-colors text-sm"><i class="fab fa-telegram"></i></a>
+                <?php if (!empty($waNumber)): ?>
+                <a href="https://wa.me/<?= $waNumber ?>" target="_blank" class="text-[var(--muted)] hover:text-emerald-400 transition-colors text-sm"><i class="fab fa-whatsapp"></i></a>
+                <?php endif; ?>
+                <?php if (!empty($settings['admin_contact'])): ?>
+                <a href="mailto:<?= sanitize($settings['admin_contact']) ?>" class="text-[var(--muted)] hover:text-emerald-400 transition-colors text-sm"><i class="fas fa-envelope"></i></a>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 </footer>
 
-<!-- ==================== JAVASCRIPT ==================== -->
 <script>
 (function() {
     'use strict';
 
-    // === Scroll Reveal ===
     const revealEls = document.querySelectorAll('.reveal');
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
-                observer.unobserve(entry.target);
-            }
+            if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); }
         });
     }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
     revealEls.forEach(el => observer.observe(el));
 
-    // === Rate bar animasi ===
     const rateBars = document.querySelectorAll('.rate-fill');
     const barObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
@@ -1121,7 +1065,6 @@ foreach ($allTransactions as $t) {
     }, { threshold: 0.3 });
     rateBars.forEach(el => barObserver.observe(el));
 
-    // === Provider select: tampilkan info ===
     const providerSelect = document.getElementById('providerSelect');
     const providerInfo = document.getElementById('providerInfo');
     const providerRate = document.getElementById('providerRate');
@@ -1131,11 +1074,7 @@ foreach ($allTransactions as $t) {
     if (providerSelect) {
         providerSelect.addEventListener('change', function() {
             const opt = this.options[this.selectedIndex];
-            if (!opt.value) {
-                providerInfo.classList.add('hidden');
-                updateEstimate();
-                return;
-            }
+            if (!opt.value) { providerInfo.classList.add('hidden'); updateEstimate(); return; }
             providerInfo.classList.remove('hidden');
             providerRate.textContent = 'Rate: ' + (parseFloat(opt.dataset.rate) * 100) + '%';
             providerMin.textContent = formatRp(parseInt(opt.dataset.min));
@@ -1144,7 +1083,6 @@ foreach ($allTransactions as $t) {
         });
     }
 
-    // === Payment select: update placeholder ===
     const paymentSelect = document.getElementById('paymentSelect');
     const payAccountInput = document.getElementById('payAccountInput');
     if (paymentSelect && payAccountInput) {
@@ -1154,23 +1092,17 @@ foreach ($allTransactions as $t) {
         });
     }
 
-    // === Nominal input: update estimate ===
     const amountInput = document.getElementById('amountInput');
     if (amountInput) {
         amountInput.addEventListener('input', function() {
-            // Hanya angka
             this.value = this.value.replace(/[^0-9]/g, '');
             updateEstimate();
             updateChips();
         });
     }
 
-    // === Chip nominal ===
     window.setAmount = function(val) {
-        if (amountInput) {
-            amountInput.value = val;
-            amountInput.dispatchEvent(new Event('input'));
-        }
+        if (amountInput) { amountInput.value = val; amountInput.dispatchEvent(new Event('input')); }
     };
 
     function updateChips() {
@@ -1182,37 +1114,24 @@ foreach ($allTransactions as $t) {
         });
     }
 
-    // === Kalkulasi estimasi ===
     function updateEstimate() {
         const box = document.getElementById('estimateBox');
         const valEl = document.getElementById('estimateValue');
         const rateEl = document.getElementById('estimateRate');
         const prov = providerSelect.value;
         const amount = parseInt(amountInput.value) || 0;
-
-        if (!prov || amount <= 0) {
-            box.classList.add('hidden');
-            return;
-        }
-
+        if (!prov || amount <= 0) { box.classList.add('hidden'); return; }
         const opt = providerSelect.options[providerSelect.selectedIndex];
         const rate = parseFloat(opt.dataset.rate);
         const received = Math.floor(amount * rate);
-
         box.classList.remove('hidden');
         valEl.textContent = formatRp(received);
         rateEl.textContent = (rate * 100) + '%';
     }
 
-    // === Phone input: hanya angka ===
     const phoneInput = document.getElementById('phoneInput');
-    if (phoneInput) {
-        phoneInput.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-    }
+    if (phoneInput) { phoneInput.addEventListener('input', function() { this.value = this.value.replace(/[^0-9]/g, ''); }); }
 
-    // === Tab switching ===
     window.switchTab = function(tab) {
         document.getElementById('panelForm').classList.toggle('hidden', tab !== 'form');
         document.getElementById('panelCheck').classList.toggle('hidden', tab !== 'check');
@@ -1220,86 +1139,47 @@ foreach ($allTransactions as $t) {
         document.getElementById('tabForm').classList.toggle('active', tab === 'form');
         document.getElementById('tabCheck').classList.toggle('active', tab === 'check');
         document.getElementById('tabHistory').classList.toggle('active', tab === 'history');
-
-        // Re-observe reveal elements
         document.querySelectorAll('.reveal:not(.visible)').forEach(el => observer.observe(el));
     };
 
-    // === FAQ toggle ===
     window.toggleFaq = function(btn) {
         const answer = btn.nextElementSibling;
         const icon = btn.querySelector('i');
         const isOpen = answer.style.maxHeight && answer.style.maxHeight !== '0px';
-
-        // Tutup semua dulu
         document.querySelectorAll('.faq-answer').forEach(a => { a.style.maxHeight = '0px'; });
-        document.querySelectorAll('.faq-answer').forEach(a => {
-            a.previousElementSibling.querySelector('i').style.transform = 'rotate(0deg)';
-        });
-
-        if (!isOpen) {
-            answer.style.maxHeight = answer.scrollHeight + 'px';
-            icon.style.transform = 'rotate(180deg)';
-        }
+        document.querySelectorAll('.faq-answer').forEach(a => { a.previousElementSibling.querySelector('i').style.transform = 'rotate(0deg)'; });
+        if (!isOpen) { answer.style.maxHeight = answer.scrollHeight + 'px'; icon.style.transform = 'rotate(180deg)'; }
     };
 
-    // === Copy TX ID ===
     window.copyTxId = function(id) {
         navigator.clipboard.writeText(id).then(() => {
             showToast('ID transaksi ' + id + ' berhasil disalin!', 'success');
         }).catch(() => {
-            // Fallback
-            const ta = document.createElement('textarea');
-            ta.value = id;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
+            const ta = document.createElement('textarea'); ta.value = id; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
             showToast('ID transaksi berhasil disalin!', 'success');
         });
     };
 
-    // === Toast inline ===
     function showToast(msg, type) {
         const container = document.querySelector('.toast-container') || createToastContainer();
         const div = document.createElement('div');
         div.className = 'toast toast-' + type;
-        div.innerHTML = `
-            <i class="fas ${type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-red-400'} mt-0.5"></i>
-            <div class="text-sm leading-relaxed">${msg}</div>
-            <button onclick="this.parentElement.remove()" class="ml-auto text-white/30 hover:text-white/60 transition-colors">
-                <i class="fas fa-xmark"></i>
-            </button>
-        `;
+        div.innerHTML = '<i class="fas ' + (type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-red-400') + ' mt-0.5"></i><div class="text-sm leading-relaxed">' + msg + '</div><button onclick="this.parentElement.remove()" class="ml-auto text-white/30 hover:text-white/60 transition-colors"><i class="fas fa-xmark"></i></button>';
         container.appendChild(div);
         setTimeout(() => { if (div.parentElement) div.remove(); }, 4000);
     }
-    function createToastContainer() {
-        const c = document.createElement('div');
-        c.className = 'toast-container';
-        document.body.appendChild(c);
-        return c;
-    }
+    function createToastContainer() { const c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); return c; }
 
-    // === Format Rupiah ===
-    function formatRp(val) {
-        return 'Rp' + val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    }
+    function formatRp(val) { return 'Rp' + val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 
-    // === Auto-scroll ke result jika ada ===
     <?php if ($currentTab === 'result' && $lastTx): ?>
-    setTimeout(() => {
-        const el = document.getElementById('result');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 300);
+    setTimeout(() => { const el = document.getElementById('result'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
     <?php endif; ?>
 
-    // === Navbar shadow on scroll ===
     const nav = document.querySelector('nav');
     window.addEventListener('scroll', () => {
         nav.style.borderBottomColor = window.scrollY > 20 ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)';
     }, { passive: true });
-
 })();
 </script>
 
