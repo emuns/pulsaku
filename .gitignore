@@ -1,11 +1,13 @@
-# Data transaksi (jangan commit ke git)
+# Data
 data/transactions.json
+data/settings.json
+data/admins.json
+data/activity.log
+data/rate_limit_*.json
 
-# OS
+# OS & IDE
 .DS_Store
 Thumbs.db
-
-# IDE
 .idea/
 .vscode/
 *.swp
