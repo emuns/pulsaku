@@ -825,7 +825,12 @@ foreach ($allTransactions as $t) {
                                         <td class="hide-mobile text-emerald-400 font-semibold"><?= rupiah($tx['received']) ?></td>
                                         <td class="text-sm"><?= $tx['payment_name'] ?></td>
                                         <td>
-                                            <span class="badge badge-<?= $tx['status'] ?>">
+                                        
+.badge-sent {
+    background: rgba(59,130,246,0.12);
+    color: #60a5fa;
+    border: 1px solid rgba(59,130,246,0.25);
+}
                                                 <i class="fas fa-circle text-[5px]"></i>
                                                 <?= ucfirst($tx['status']) ?>
                                             </span>
