@@ -376,8 +376,10 @@ function renderAdminPage(string $title, string $content, string $activePage = ''
         <div class="px-5 mb-2 mt-6 text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">Pengaturan</div>
         <a href="settings.php" class="nav-link <?= $activePage === 'settings' ? 'active' : '' ?>">
             <i class="fas fa-sliders"></i> Rate & Metode
-        </a>
-
+</a>
+<a href="api_keys.php" class="nav-link <?= $activePage === 'api-keys' ? 'active' : '' ?>">
+    <i class="fas fa-key"></i> API Keys
+</a>
         <div class="px-5 mb-2 mt-6 text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">Sistem</div>
         <a href="transactions.php?tab=logs" class="nav-link <?= $activePage === 'logs' ? 'active' : '' ?>">
             <i class="fas fa-scroll"></i> Activity Log
