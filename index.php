@@ -826,6 +826,7 @@ foreach ($allTransactions as $t) {
                                         <td class="text-sm"><?= $tx['payment_name'] ?></td>
                                         <td>
                                         
+/* Tambahkan di dalam <style> di index.php */
 .badge-sent {
     background: rgba(59,130,246,0.12);
     color: #60a5fa;
