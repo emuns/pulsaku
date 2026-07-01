@@ -1,0 +1,11 @@
+# Data transaksi (jangan commit ke git)
+data/transactions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

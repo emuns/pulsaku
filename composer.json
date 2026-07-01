@@ -1,0 +1,12 @@
+{
+    "name": "pulsaku/convert-pulsa",
+    "description": "Aplikasi konversi pulsa ke e-wallet dan rekening bank",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1"
+    },
+    "scripts": {
+        "start": "php -S 0.0.0.0:${PORT:-3000}"
+    }
+}

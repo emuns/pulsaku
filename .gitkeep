@@ -1,0 +1,2 @@
+# Buat file .gitkeep
+touch data/.gitkeep
