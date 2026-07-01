@@ -1,0 +1,24 @@
+# Proteksi: hanya bisa diakses melalui browser (bukan direct file access untuk data)
+# Auth dasar via PHP sudah ditangani di config.php
+
+# Blok akses langsung ke config.php
+<Files "config.php">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</Files>
+
+# Keamanan: blok akses file non-PHP
+<FilesMatch "\.(json|log|ini|txt|md)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

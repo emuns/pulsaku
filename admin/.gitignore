@@ -1,0 +1,14 @@
+# Data (jangan commit data transaksi/log/admin)
+data/transactions.json
+data/settings.json
+data/admins.json
+data/activity.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
