@@ -201,11 +201,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             array_unshift($allTx, $tx);
             saveTransactions($allTx);
 
-            $lastTx = $tx;
-            $currentTab = 'result';
-            setFlash('success', 'Transaksi berhasil dibuat! Segera transfer pulsa Anda.');
-            header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . '?tab=result');
-            exit;
+            
+ $currentTab = 'result';
+setFlash('success', 'Transaksi berhasil dibuat! Segera transfer pulsa Anda.');
+header('Location: transfer.php?tx=' . $tx['id']);
+exit;
         } else {
             setFlash('error', implode('<br>', $errors));
             header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . '?tab=form');
