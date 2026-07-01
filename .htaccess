@@ -56,3 +56,13 @@ DirectoryIndex index.php
     php_value session.cookie_secure 1
     php_value session.use_strict_mode 1
 </IfModule>
+# Blok akses langsung ke folder data (selain dari PHP)
+<DirectoryMatch "^.*data\/.*$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</DirectoryMatch>
